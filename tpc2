@@ -1,0 +1,77 @@
+import random
+
+def des(n):
+    print()
+    print("Fósforos restantes: "+str(n))
+    print("| "*n)
+
+def loss():
+    print()
+    print("Apenas um fósforo restante!")
+    print("O computador ganhou!")
+
+def win():
+    print()
+    print("Apenas um fósforo restante!")
+    print("Ganhaste!")
+
+def rng():
+    return random.randint(1,4)
+
+print("JOGO DOS FÓSFOROS")
+pos = int(input("Queres ser o primeiro ou o segundo jogador? (Escreva 1 ou 2)"))
+fos = 21
+des(fos)
+if pos == 1:
+    while fos != 1:
+        aux1 = int(input("Quantos fósforos quer tirar? (1-4)"))
+        if 4 < aux1:
+            print()
+            print("Isso são fósforos a mais!")
+            print("Joga de novo!")
+            break
+        fos = fos - aux1
+        print()
+        print("Retiraste " + str(aux1) + " fósforo(s)")
+        des(fos); aux2 = ((fos - 1) % 5)
+        fos = fos - aux2
+        print()
+        print("O computador retirou " + str(aux2) + " fósforo(s)")
+        des(fos)
+    if(fos == 1):
+        loss()
+else:
+    aux3 = 1
+    while fos != 1:
+        if aux3 == 1:
+            aux2 = rng()
+            aux3 = aux3 + 1
+        else:
+            if fos == 16:
+                aux2 = rng()
+            elif fos == 11:
+                aux2 = rng()
+            elif fos == 6:
+                aux2 == rng()
+            else:
+                aux2 = ((fos - 1) % 5)
+        fos = fos - aux2
+        print()
+        print("O computador retirou " + str(aux2) + " fósforo(s)")
+        des(fos)
+        if(fos == 1):
+            loss()
+            break
+        aux1 = int(input("Quantos fósforos quer tirar? (1-4)"))
+        if 4 < aux1:
+            print()
+            print("Isso são fósforos a mais!")
+            print("Joga de novo!")
+            break
+        fos = fos - aux1
+        print()
+        print("Retiraste " + str(aux1) + " fósforo(s)")
+        des(fos)
+        if(fos == 1):
+            win()
+            break
