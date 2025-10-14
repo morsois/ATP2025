@@ -1,0 +1,114 @@
+vend1 = [1,2,3,4,5]; sal1 = [100, vend1, "Star Wars Ep.III"]
+vend2 = [1,2,3,4,5]; sal2 = [150, vend2, "Annabelle"]
+vend3 = [1,2,3,4,5]; sal3 = [200, vend3, "Minecraft: O Filme"]
+vend4 = [1,2,3,4,5]; sal4 = [150, vend4, "Carros"]
+cinema = [sal1, sal2, sal3]
+
+def listar(cinema):
+    print("\nFILMES EM EXIBICAO:\n")
+    sal = 0
+    for i in cinema:
+        sal = sal + 1
+        print(f"{i[2]} na sala {sal}")
+
+def dispon(cinema, filme, lugar):
+    aux1 = 0; aux2 = -1; i = 0; res = True
+    while aux1 < len(cinema):
+        if filme == cinema[aux1][2]:
+            aux2 = aux1
+            break;
+        aux1 = aux1 + 1
+    if aux2 == -1:
+        print("\nNao existe nenhuma sala com esse filme em exibicao!")
+        return False
+    while i < len(cinema[aux2][1]):
+        if i == lugar:
+            res = False
+        i = i + 1
+    if cinema[aux2][0] < lugar:
+        print("\nA sala nao contem tantos lugares!")
+        return False
+    elif res == False:
+        return False
+    else:
+        return True
+
+def vendebilhete (cinema1, filme, lugar):
+    cinema2 = cinema1; aux1 = 0; aux2 = 0
+    if dispon(cinema1, filme, lugar) == False:
+        if (cinema1[aux2][0] < lugar) == True:
+            print("\nEsse lugar esta indisponivel!")
+            return
+    else:
+        while aux1 < len(cinema1):
+            if filme == cinema1[aux1][2]:
+                aux2 = aux1
+                break;
+            aux1 = aux1 + 1
+        cinema2[aux2][1].append(lugar)
+    return cinema2
+
+def listarDispon(cinema):
+    i = 0;
+    print("\nEM EXIBICAO")
+    while i < len(cinema):
+        print(f"SALA {i + 1} - {cinema[i][2]}")  
+        aux1 = []; aux2 = 0
+        while aux2 < cinema[i][0]:
+            aux1.append(aux2 + 1)
+            aux2 = aux2 + 1
+        for elem in cinema[i][1]:
+            for num in aux1:
+                if elem == num:
+                    aux1.remove(elem)
+        print(aux1)
+        print()
+        i = i + 1
+
+def inserirSala(cinema, sal):
+    for sala in cinema:
+        if sala == sal:
+            print("\nEsta sala ja existe!")
+            return
+    cinema.append(sal)
+    print("\nSala adicionada com sucesso")
+
+def menu():
+    print(f"\nOpcoes disponiveis:\n(0) Sair")
+    print(f"(1) Listar filmes\n(2) Disponibilidade de um lugar\n(3) Disponibilidades\n(4) Resevar lugar\n(5) Inserir sala")
+
+print(f"="*50 + "\n" + " "*19 + "CINEMAS NOS\n" + "="*50)
+while True:
+    menu()
+    opcao = int(input("Selecione uma opcao: "))
+    if opcao == 0:
+        print("Obrigado e volte sempre!...")
+        break;
+    elif opcao == 1:
+        listar(cinema)
+    elif opcao == 2:
+        filme = input("Que filme vai querer ver? ")
+        lugar = int(input("Que lugar quer escolher? "))
+        aux1 = 0; aux2 = -1
+        while aux1 < len(cinema):
+            if filme == cinema[aux1][2]:
+                aux2 = aux1
+                break;
+            aux1 = aux1 + 1
+        if aux2 == -1:
+            print("\nNao existe nenhuma sala com esse filme em exibicao!")
+        elif dispon(cinema, filme, lugar):
+            print("\nLugar disponivel!")
+        else:
+            print("\nLugar ocupado!")
+    elif opcao == 3:
+        listarDispon(cinema)
+    elif opcao == 4:
+        filme = input("Que filme vai querer ver? ")
+        lugar = int(input("Que lugar quer escolher? "))
+        if dispon(cinema, filme, lugar):
+            cinema = vendebilhete(cinema, filme, lugar)
+            print("\nLugar reservado com sucesso")
+        else:
+            print("\nEsse lugar esta ocupado!")
+    elif opcao == 5: inserirSala(cinema, sal4)
