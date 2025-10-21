@@ -1,0 +1,172 @@
+turma = []
+
+def inserir_aluno(turma):
+    print("\n--- Inserir Aluno ---")
+    nome = input("Nome do aluno: ")
+    id_aluno = input("ID do aluno: ")
+    
+    for aluno in turma:
+        if aluno[1] == id_aluno:
+            print("Erro: Ja existe um aluno com este ID!")
+            return turma
+    
+    print("Notas (valores entre 0-20):")
+    notaTPC = float(input("Nota TPC: "))
+    notaProj = float(input("Nota Projeto: "))
+    notaTeste = float(input("Nota Teste: "))
+    
+    aluno = (nome, id_aluno, [notaTPC, notaProj, notaTeste])
+    turma.append(aluno)
+    print(f"Aluno {nome} inserido com sucesso!")
+    return turma
+
+def listar_turma(turma):
+    print("\n--- Lista da Turma ---")
+    if len(turma) == 0:
+        print("A turma esta vazia.")
+        return
+    
+    for i, aluno in enumerate(turma, 1):
+        nome, id_aluno, notas = aluno
+        notaTPC, notaProj, notaTeste = notas
+        media = (notaTPC + notaProj + notaTeste) / 3
+        print(f"{i}. {nome} (ID: {id_aluno}) - TPC: {notaTPC:.1f}, Proj: {notaProj:.1f}, Teste: {notaTeste:.1f} | Media: {media:.1f}")
+
+def consultar_aluno(turma):
+    print("\n--- Consultar Aluno ---")
+    if len(turma) == 0:
+        print("A turma esta vazia.")
+        return
+    
+    id_consulta = input("ID do aluno a consultar: ")
+    
+    for aluno in turma:
+        nome, id_aluno, notas = aluno
+        if id_aluno == id_consulta:
+            notaTPC, notaProj, notaTeste = notas
+            media = (notaTPC + notaProj + notaTeste) / 3
+            print(f"\nAluno encontrado:")
+            print(f"Nome: {nome}")
+            print(f"ID: {id_aluno}")
+            print(f"Nota TPC: {notaTPC:.1f}")
+            print(f"Nota Projeto: {notaProj:.1f}")
+            print(f"Nota Teste: {notaTeste:.1f}")
+            print(f"Media: {media:.1f}")
+            return
+    
+    print(f"Aluno com ID {id_consulta} nao encontrado.")
+
+def guardar_turma(turma):
+    print("\n--- Guardar Turma ---")
+    if len(turma) == 0:
+        print("A turma esta vazia. Nada para guardar.")
+        return
+    
+    nome_ficheiro = input("Nome do ficheiro para guardar: ")
+    
+    try:
+        f = open(nome_ficheiro, 'w')
+        for aluno in turma:
+            nome, id_aluno, notas = aluno
+            notaTPC, notaProj, notaTeste = notas
+            linha = f"{nome},{id_aluno},{notaTPC},{notaProj},{notaTeste}\n"
+            f.write(linha)
+        f.close()
+        print(f"Turma guardada com sucesso no ficheiro '{nome_ficheiro}'!")
+    except:
+        print("Erro ao guardar turma!")
+
+def carregar_turma():
+    print("\n--- Carregar Turma ---")
+    nome_ficheiro = input("Nome do ficheiro para carregar: ")
+    
+    turma = []
+    
+    try:
+        f = open(nome_ficheiro, 'r')
+        linhas = f.readlines()
+        f.close()
+        
+        for linha in linhas:
+            dados = linha.strip().split(',')
+            if len(dados) == 5:
+                nome = dados[0]
+                id_aluno = dados[1]
+                notaTPC = float(dados[2])
+                notaProj = float(dados[3])
+                notaTeste = float(dados[4])
+                aluno = (nome, id_aluno, [notaTPC, notaProj, notaTeste])
+                turma.append(aluno)
+        
+        print(f"Turma carregada com sucesso do ficheiro '{nome_ficheiro}'!")
+        print(f"Foram carregados {len(turma)} alunos.")
+        return turma
+    except:
+        print("Erro ao carregar turma!")
+        return None
+
+def mostrar_menu():
+    print("\n" + "="*50)
+    print("          SISTEMA DE GESTAO DE TURMAS")
+    print("="*50)
+    print("1: Criar uma turma")
+    print("2: Inserir um aluno na turma")
+    print("3: Listar a turma")
+    print("4: Consultar um aluno por id")
+    print("8: Guardar a turma em ficheiro")
+    print("9: Carregar uma turma de um ficheiro")
+    print("0: Sair da aplicacao")
+    print("="*50)
+
+def criar_turma_exemplo():
+    turma_exemplo = [
+        ("Rodrigo Moco", "001", [15.0, 16.0, 14.0]),
+        ("Diogo Rocha", "002", [12.0, 13.0, 15.0]),
+        ("Goncalo Sousa", "003", [17.0, 18.0, 16.0]),
+        ("Alexandre Ramos", "004", [10.0, 11.0, 12.0]),
+        ("Vasco Amorim", "005", [19.0, 17.0, 18.0])
+    ]
+    print("\nTurma de exemplo criada com 5 alunos!")
+    return turma_exemplo
+
+def main():
+    turma = []
+    
+    while True:
+        mostrar_menu()
+        opcao = input("Selecione uma opcao: ")
+        
+        if opcao == "1":
+            turma = criar_turma_exemplo()
+            print("Nova turma criada!")
+            
+        elif opcao == "2":
+            turma = inserir_aluno(turma)
+                
+        elif opcao == "3":
+            listar_turma(turma)
+                
+        elif opcao == "4":
+            consultar_aluno(turma)
+                
+        elif opcao == "8":
+            guardar_turma(turma)
+                
+        elif opcao == "9":
+            nova_turma = carregar_turma()
+            if nova_turma is not None:
+                turma = nova_turma
+                
+        elif opcao == "0":
+            print("A sair da aplicacao...")
+            break
+            
+        elif opcao == "exemplo":
+            turma = criar_turma_exemplo()
+            
+        else:
+            print("Opcao invalida! Tente novamente.")
+
+if __name__ == "__main__":
+    print("Bem-vindo ao Sistema de Gestao de Turmas!")
+    main()
