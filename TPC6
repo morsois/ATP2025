@@ -1,0 +1,190 @@
+import matplotlib.pyplot as plt
+
+tabMeteo1 = [((2022,1,20), 2, 16, 0),((2022,1,21), 1, 13, 0.2),((2022,1,22), 7, 17, 0.01)]
+
+# TabMeteo = [(Data,TempMin,TempMax,Precipitacao)]
+# Data = (Int,Int,Int)
+# TempMin = Float
+# TempMax = Float
+# Precipitacao = Float
+
+def medias(tabMeteo1):
+  res = []
+  for i in range(len(tabMeteo1)):
+    aux = (tabMeteo1[i][2] + tabMeteo1[i][1])/2
+    res.append((tabMeteo1[i][0], aux))
+  return res
+
+def guardar(tabMeteo1, fnome):
+  f = open(fnome, "w")
+  for i in range(len(tabMeteo1)):
+    data, tmin, tmax, prec = tabMeteo1[i]
+    ano, mes, dia = data
+    f.write(f"{ano},{mes},{dia},{tmin},{tmax},{prec}\n")
+  f.close()
+
+def ler(fnome):
+  f = open(fnome, "r"); res = []
+  for linha in f:
+    ano, mes, dia, tmin, tmax, prec = linha.split(",")
+    res.append(((int(ano), int(mes), int(dia)), float(tmin), float(tmax), float(prec)))
+  return res
+
+def min(tabMeteo):
+    min = tabMeteo[0][1]
+    for _, temp_min, _, _ in tabMeteo:
+        if temp_min < min:
+            min = temp_min
+    return min
+
+def amplitude(tabMeteo):
+    res = []
+    for data, temp_min, temp_max, _ in tabMeteo:
+        amplitude = temp_max - temp_min
+        res.append((data, round(amplitude, 2)))
+    return res
+
+def maxChuva(tabMeteo):
+    max_data, max_prec = tabMeteo[0][0], tabMeteo[0][3]
+    for data, _, _, precip in tabMeteo:
+        if precip > max_prec:
+            max_data, max_prec = data, precip
+    return (max_data, max_prec)
+
+def diasChuvosos(tabMeteo, p):
+    res = []
+    for data, _, _, precip in tabMeteo:
+        if precip > p:
+            res.append((data, precip))
+    return res
+
+def maxPeriodoCalor(tabMeteo, p):
+    max_seq = 0
+    seq_atual = 0
+    for _, _, _, precip in tabMeteo:
+        if precip < p:
+            seq_atual = seq_atual + 1
+            if seq_atual > max_seq:
+                max_seq = seq_atual
+        else: seq_atual = 0
+    return max_seq
+
+def grafTabMeteo(t):
+    datas = [f"{data[2]}/{data[1]}" for data, _, _, _ in t]
+    temp_min = [temp_min for _, temp_min, _, _ in t]
+    temp_max = [temp_max for _, _, temp_max, _ in t]
+    precip = [precip for _, _, _, precip in t]
+    
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+
+    ax1.plot(datas, temp_min, 'b-o', label='Temp Mínima')
+    ax1.plot(datas, temp_max, 'r-o', label='Temp Máxima')
+    ax1.set_title('Temperaturas Mínima e Máxima')
+    ax1.set_ylabel('Temperatura (°C)')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    ax2.bar(datas, precip, color='blue', alpha=0.7)
+    ax2.set_title('Precipitação')
+    ax2.set_ylabel('Precipitação (mm)')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
+def menu():
+    tabela_atual = tabMeteo1.copy()
+    while True:
+        print("\n" + "="*50)
+        print("          APLICAÇÃO METEOROLÓGICA")
+        print("="*50)
+        print("1. Ver tabela atual")
+        print("2. Calcular temperaturas médias")
+        print("3. Calcular amplitudes térmicas")
+        print("4. Encontrar temperatura mínima mais baixa")
+        print("5. Encontrar dia com maior precipitação")
+        print("6. Dias chuvosos (precipitação > limite)")
+        print("7. Maior período sem chuva")
+        print("8. Guardar tabela em ficheiro")
+        print("9. Carregar tabela de ficheiro")
+        print("10. Mostrar gráficos")
+        print("0. Sair")
+        print("-"*50)
+        
+        opcao = input("Escolha uma opção: ").strip()
+        
+        if opcao == "1":
+            print("\nTabela Meteorológica Atual:")
+            for i, (data, tmin, tmax, prec) in enumerate(tabela_atual, 1):
+                print(f"{i}. {data}: Min={tmin}°C, Max={tmax}°C, Precip={prec}mm")
+                
+        elif opcao == "2":
+            medias_result = medias(tabela_atual)
+            print("\nTemperaturas Médias:")
+            for data, media in medias_result:
+                print(f"{data}: {media}°C")
+                
+        elif opcao == "3":
+            amplitudes = amplitude(tabela_atual)
+            print("\nAmplitudes Térmicas:")
+            for data, amp in amplitudes:
+                print(f"{data}: {amp}°C")
+                
+        elif opcao == "4":
+            minima = min(tabela_atual)
+            print(f"\nTemperatura mínima mais baixa: {minima}°C")
+            
+        elif opcao == "5":
+            data_max, prec_max = maxChuva(tabela_atual)
+            print(f"\nDia com maior precipitação: {data_max} com {prec_max}mm")
+            
+        elif opcao == "6":
+            try:
+                limite = float(input("Digite o limite de precipitação (mm): "))
+                dias_chuvosos = diasChuvosos(tabela_atual, limite)
+                if dias_chuvosos:
+                    print(f"\nDias com precipitação > {limite}mm:")
+                    for data, prec in dias_chuvosos:
+                        print(f"{data}: {prec}mm")
+                else:
+                    print(f"\nNenhum dia com precipitação > {limite}mm")
+            except ValueError:
+                print("Valor inválido!")
+                
+        elif opcao == "7":
+            try:
+                limite = float(input("Digite o limite de precipitação (mm): "))
+                periodo = maxPeriodoCalor(tabela_atual, limite)
+                print(f"\nMaior período com precipitação < {limite}mm: {periodo} dias")
+            except ValueError:
+                print("Valor inválido!")
+                
+        elif opcao == "8":
+            nome_ficheiro = input("Nome do ficheiro para guardar: ").strip()
+            if nome_ficheiro:
+                guardar(tabela_atual, nome_ficheiro)
+                print(f"Tabela guardada em {nome_ficheiro}")
+            else:
+                print("Nome de ficheiro inválido!")
+                
+        elif opcao == "9":
+            nome_ficheiro = input("Nome do ficheiro para carregar: ").strip()
+            if nome_ficheiro:
+                nova_tabela = ler(nome_ficheiro)
+                if nova_tabela:
+                    tabela_atual = nova_tabela
+                    print(f"Tabela carregada de {nome_ficheiro} com {len(tabela_atual)} registos")
+                else:
+                    print("Ficheiro vazio ou não encontrado!")
+            else:
+                print("Nome de ficheiro inválido!")
+                
+        elif opcao == "10":
+            print("A gerar gráficos...")
+            grafTabMeteo(tabela_atual)
+
+        elif opcao == "0":
+            print("Saindo...")
+            break
+
+menu()
