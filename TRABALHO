@@ -1,0 +1,507 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
+import numpy as np
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import time
+import threading
+
+# Configurações iniciais
+TAXA_CHEGADA = 10
+NUM_MEDICOS = 3
+TEMPO_CONSULTA = 15
+TEMPO_SIMULACAO = 480
+
+nomes=[
+    "Ana", "Bruno", "Carla", "Diogo", "Eva",
+    "Fábio", "Gabriela", "Hugo", "Inês", "João",
+    "Kátia", "Luís", "Marta", "Nuno", "Olga", "Vasco",
+    "Paulo", "Rita", "Sérgio", "Tatiana", "Vítor",
+    "Zélia", "André", "Beatriz", "Catarina", "Daniela",
+    "Eduardo", "Flávia", "Gonçalo", "Helena", "Isabel",
+    "Júlio", "Kassange", "Leonardo", "Mariana", "Nádia",
+    "Óscar", "Patrícia", "Quintino", "Rafael", "Sofia",
+    "Tiago", "Úrsula", "Vera", "Wagner", "Xavier",
+    "Yara", "Zeca", "Taras"
+]
+sobrenomes=[
+    "Silva", "Santos", "Ferreira", "Pereira", "Oliveira",
+    "Costa", "Rodrigues", "Almeida", "Nascimento", "Lima",
+    "Gomes", "Martins", "Carvalho", "Rocha", "Dias",
+    "Sousa", "Fernandes", "Vieira", "Mendes", "Castro", "Syzon"
+]
+
+def tempo_entre_chegadas(taxa):
+    return np.random.poisson(60 / taxa)
+
+def tempo_de_consulta(media=15, tipo="exponential"):
+    if tipo == "exponential":
+        return np.random.exponential(media)
+    elif tipo == "normal":
+        return max(1, np.random.normal(media, media/3))
+    elif tipo == "uniform":
+        return np.random.uniform(media*0.5, media*1.5)
+    return media
+
+class JanelaVisualizacao:
+    def __init__(self, num_medicos):
+        self.janela = tk.Toplevel()
+        self.janela.title("Visualização em Tempo Real da Clínica")
+        self.janela.geometry("1050x700")
+        self.num_medicos = num_medicos
+        
+        frame_principal = ttk.Frame(self.janela, padding="20")
+        frame_principal.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(frame_principal, text="USF Carandá - Simulação Visual", 
+                 font=('Arial', 16, 'bold')).pack(pady=10)
+        
+        self.label_tempo = ttk.Label(frame_principal, text="Tempo: 0.0 min", 
+                                      font=('Arial', 14))
+        self.label_tempo.pack(pady=5)
+        
+        ttk.Separator(frame_principal, orient='horizontal').pack(fill='x', pady=10)
+        
+        ttk.Label(frame_principal, text="Consultórios Médicos", 
+                 font=('Arial', 13, 'bold')).pack(pady=5)
+        
+        frame_consultorios = ttk.Frame(frame_principal)
+        frame_consultorios.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        self.labels_medicos = []
+        for i in range(num_medicos):
+            frame_consultorio = ttk.LabelFrame(frame_consultorios, 
+                                               text=f"Consultório {i+1}", 
+                                               padding="15")
+            frame_consultorio.pack(side=tk.LEFT, padx=10, fill=tk.BOTH, expand=True)
+            
+            label_status = ttk.Label(frame_consultorio, text="💚 LIVRE", 
+                                    font=('Arial', 12, 'bold'), 
+                                    foreground='green')
+            label_status.pack(pady=5)
+            
+            label_doente = ttk.Label(frame_consultorio, text="", 
+                                    font=('Arial', 10))
+            label_doente.pack(pady=5)
+            
+            self.labels_medicos.append({
+                'status': label_status,
+                'doente': label_doente
+            })
+        
+        ttk.Separator(frame_principal, orient='horizontal').pack(fill='x', pady=10)
+        
+        ttk.Label(frame_principal, text="⏳ Fila de Espera", 
+                 font=('Arial', 13, 'bold')).pack(pady=5)
+        
+        self.label_fila_tamanho = ttk.Label(frame_principal, 
+                                           text="Pessoas na fila: 0", 
+                                           font=('Arial', 12))
+        self.label_fila_tamanho.pack(pady=5)
+        
+        frame_fila = ttk.Frame(frame_principal)
+        frame_fila.pack(pady=10, fill=tk.BOTH, expand=True)
+        
+        self.canvas_fila = tk.Canvas(frame_fila, height=150, bg='white', 
+                                     relief=tk.SUNKEN, borderwidth=2)
+        self.canvas_fila.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Separator(frame_principal, orient='horizontal').pack(fill='x', pady=10)
+        
+        self.label_estatisticas = ttk.Label(frame_principal, 
+                                           text="Doentes atendidos: 0", 
+                                           font=('Arial', 11))
+        self.label_estatisticas.pack(pady=5)
+        
+        frame_controlo = ttk.Frame(frame_principal)
+        frame_controlo.pack(pady=10)
+        
+        ttk.Label(frame_controlo, text="Velocidade:").pack(side=tk.LEFT, padx=5)
+        self.slider_velocidade = ttk.Scale(frame_controlo, from_=0.01, to=1.0, 
+                                          orient=tk.HORIZONTAL, length=200)
+        self.slider_velocidade.set(0.5)
+        self.slider_velocidade.pack(side=tk.LEFT, padx=5)
+        ttk.Label(frame_controlo, text="(mais rápido ← → mais lento)").pack(side=tk.LEFT, padx=5)
+    
+    def atualizar_tempo(self, tempo):
+        self.label_tempo.config(text=f"Tempo: {tempo:.1f} min")
+    
+    def atualizar_medico(self, indice, ocupado, doente_id=None):
+        if ocupado:
+            self.labels_medicos[indice]['status'].config(text="🔴 OCUPADO", 
+                                                         foreground='red')
+            self.labels_medicos[indice]['doente'].config(
+                text=f"Em consulta:\n{np.random.choice(nomes)} {np.random.choice(sobrenomes)}")
+        else:
+            self.labels_medicos[indice]['status'].config(text="💚 LIVRE", 
+                                                         foreground='green')
+            self.labels_medicos[indice]['doente'].config(text="")
+    
+    def atualizar_fila(self, fila):
+        self.canvas_fila.delete("all")
+        
+        tamanho = len(fila)
+        self.label_fila_tamanho.config(text=f"Pessoas na fila: {tamanho}")
+        
+        if tamanho > 0:
+            largura_canvas = self.canvas_fila.winfo_width()
+            if largura_canvas <= 1:
+                largura_canvas = 800
+
+            espacamento = 60
+            x_inicial = 40
+            y = 75
+            
+            for i, (doente_id, _) in enumerate(fila[:15]):
+                x = x_inicial + i * espacamento
+                
+                # Cabeça
+                self.canvas_fila.create_oval(x-10, y-30, x+10, y-10, 
+                                            fill='white', outline='darkblue', width=3)
+                # Corpo
+                self.canvas_fila.create_line(x, y-10, x, y+10, 
+                                            fill='darkblue', width=3)
+                # Braços
+                self.canvas_fila.create_line(x-8, y, x+8, y, 
+                                            fill='darkblue', width=3)
+                # Pernas
+                self.canvas_fila.create_line(x, y+10, x-6, y+25, 
+                                            fill='darkblue', width=3)
+                self.canvas_fila.create_line(x, y+10, x+6, y+25, 
+                                            fill='darkblue', width=3)
+                
+                senha = doente_id.replace("doente_", "S")
+                self.canvas_fila.create_text(x, y+35, text=senha, 
+                                            font=('Arial', 8))
+            
+            if tamanho > 15:
+                self.canvas_fila.create_text(largura_canvas - 50, y, 
+                                            text=f"+{tamanho-15} mais...", 
+                                            font=('Arial', 10))
+    
+    def atualizar_estatisticas(self, atendidos):
+        self.label_estatisticas.config(text=f"Doentes atendidos: {atendidos}")
+    
+    def obter_velocidade(self):
+        return self.slider_velocidade.get()                       # Obtém valor do slider
+    
+    def esta_fechada(self):
+        try:
+            return not self.janela.winfo_exists()                 # Verificar se a janela foi fechada
+        except:
+            return True
+
+def simular_clinica(taxa, num_medicos, tempo_medio, tempo_total, tipo_dist="exponential", janela_vis=None):
+    fila_espera = []
+    eventos = []
+    medicos = [[False, None, 0] for _ in range(num_medicos)]     # [ocupado, doente_id, tempo_ocupado]
+    
+    tempos_espera = []
+    tamanhos_fila = []
+    tempo_fila = []
+    ocupacao_tempo = []
+    timestamps_ocupacao = []
+    quando_chegou = {}
+    quando_atendido = {}
+    
+    # Gerar chegadas
+    contador = 1
+    tempo = tempo_entre_chegadas(taxa)
+    while tempo < tempo_total:
+        doente = f"doente_{contador}"
+        eventos.append((tempo, "chegada", doente))
+        quando_chegou[doente] = tempo
+        tempo += tempo_entre_chegadas(taxa)
+        contador += 1
+    
+    eventos.sort()
+    atendidos = 0
+    
+    while eventos and not (janela_vis and janela_vis.esta_fechada()):       # Enquanto há eventos e janela aberta
+        tempo_atual, tipo, doente = eventos.pop(0)              # Próximo evento [tempo, tipo, doente]
+
+        tamanhos_fila.append(len(fila_espera))                  # Registar
+        tempo_fila.append(tempo_atual)
+        
+        ocupados = sum(1 for m in medicos if m[0])
+        ocupacao_tempo.append(ocupados / num_medicos * 100)     # Calcular ocupação de médicos em %
+        timestamps_ocupacao.append(tempo_atual)                 # Registar 
+        
+        if janela_vis:
+            janela_vis.atualizar_tempo(tempo_atual)
+            janela_vis.atualizar_fila(fila_espera)
+            janela_vis.atualizar_estatisticas(atendidos)
+        
+        if tipo == "chegada":
+            medico_livre = None
+            for i, med in enumerate(medicos):                   # Encontra médico livre 
+                if not med[0]:
+                    medico_livre = i
+            
+            if medico_livre is not None:
+                medicos[medico_livre][0] = True
+                medicos[medico_livre][1] = doente
+                quando_atendido[doente] = tempo_atual
+                
+                if janela_vis:
+                    janela_vis.atualizar_medico(medico_livre, True, doente)
+                
+                duracao = tempo_de_consulta(tempo_medio, tipo_dist)
+                eventos.append((tempo_atual + duracao, "saida", doente))             # Gera hora de saída e sort()
+                eventos.sort()
+            else:
+                fila_espera.append((doente, tempo_atual))
+        
+        elif tipo == "saida":
+            atendidos += 1
+            
+            if doente in quando_atendido:
+                espera = quando_atendido[doente] - quando_chegou[doente]             # Calcular espera
+                tempos_espera.append(max(0, espera))
+            
+            for i, med in enumerate(medicos):
+                if med[1] == doente:
+                    medicos[i][2] += tempo_atual - quando_atendido[doente]
+                    medicos[i][0] = False
+                    medicos[i][1] = None
+                    
+                    if janela_vis:
+                        janela_vis.atualizar_medico(i, False)
+                    
+                    if fila_espera:
+                        prox_doente, _ = fila_espera.pop(0)
+                        medicos[i][0] = True
+                        medicos[i][1] = prox_doente
+                        quando_atendido[prox_doente] = tempo_atual
+                        
+                        if janela_vis:
+                            janela_vis.atualizar_medico(i, True, prox_doente)
+                        
+                        duracao = tempo_de_consulta(tempo_medio, tipo_dist)             
+                        eventos.append((tempo_atual + duracao, "saida", prox_doente))
+                        eventos.sort()
+        
+        if janela_vis:
+            time.sleep(janela_vis.obter_velocidade())
+            janela_vis.janela.update()
+    
+    tempo_medio_espera = np.mean(tempos_espera) if tempos_espera else 0                 # Estatísticas finais
+    fila_media = np.mean(tamanhos_fila) if tamanhos_fila else 0
+    fila_maxima = max(tamanhos_fila) if tamanhos_fila else 0
+    
+    tempo_total_ocupado = sum(m[2] for m in medicos)                                    # Tempo total ocupado por todos os médicos
+    ocupacao_media = (tempo_total_ocupado / (num_medicos * tempo_total)) * 100          # A dividir pelo tempo total possível
+    
+    return {
+        'tempo_espera': tempo_medio_espera,
+        'fila_media': fila_media,
+        'fila_maxima': fila_maxima,
+        'ocupacao': ocupacao_media,
+        'atendidos': atendidos,
+        'tempo_fila': tempo_fila,
+        'tamanhos_fila': tamanhos_fila,
+        'timestamps_ocupacao': timestamps_ocupacao,
+        'ocupacao_tempo': ocupacao_tempo
+    }
+
+class AplicacaoClinica:
+    def __init__(self, janela):
+        self.janela = janela
+        self.janela.title("Simulação de Clínica")
+        self.janela.geometry("1400x800")
+        self.resultados = None
+        self.criar_interface()
+    
+    def criar_interface(self):
+        frame_principal = ttk.Frame(self.janela, padding="10")
+        frame_principal.grid(row=0, column=0, sticky="nsew")
+        
+        self.janela.columnconfigure(0, weight=1)
+        self.janela.rowconfigure(0, weight=1)
+        frame_principal.columnconfigure(1, weight=1)
+        frame_principal.rowconfigure(0, weight=1)
+        
+        # Lado esquerdo
+        frame_esquerda = ttk.Frame(frame_principal, padding="10")
+        frame_esquerda.grid(row=0, column=0, sticky="nsew")
+        
+        ttk.Label(frame_esquerda, text="Parâmetros da Simulação", 
+                 font=('Arial', 14, 'bold')).grid(row=0, column=0, columnspan=2, pady=10)
+        
+        ttk.Label(frame_esquerda, text="Doentes por hora:").grid(row=1, column=0, sticky="w", pady=5)
+        self.entrada_taxa = ttk.Entry(frame_esquerda, width=15)
+        self.entrada_taxa.insert(0, str(TAXA_CHEGADA))
+        self.entrada_taxa.grid(row=1, column=1, pady=5)
+        
+        ttk.Label(frame_esquerda, text="Número de médicos:").grid(row=2, column=0, sticky="w", pady=5)
+        self.entrada_medicos = ttk.Entry(frame_esquerda, width=15)
+        self.entrada_medicos.insert(0, str(NUM_MEDICOS))
+        self.entrada_medicos.grid(row=2, column=1, pady=5)
+        
+        ttk.Label(frame_esquerda, text="Tempo médio consulta (min):").grid(row=3, column=0, sticky="w", pady=5)
+        self.entrada_tempo = ttk.Entry(frame_esquerda, width=15)
+        self.entrada_tempo.insert(0, str(TEMPO_CONSULTA))
+        self.entrada_tempo.grid(row=3, column=1, pady=5)
+        
+        ttk.Label(frame_esquerda, text="Distribuição da consulta:").grid(row=4, column=0, sticky="w", pady=5)
+        self.combo_distribuicao = ttk.Combobox(frame_esquerda, width=13, 
+                                               values=['exponential', 'normal', 'uniform'],
+                                               state='readonly')
+        self.combo_distribuicao.set('exponential')
+        self.combo_distribuicao.grid(row=4, column=1, pady=5)
+        
+        ttk.Label(frame_esquerda, text="Duração simulação (min):").grid(row=5, column=0, sticky="w", pady=5)
+        self.entrada_duracao = ttk.Entry(frame_esquerda, width=15)
+        self.entrada_duracao.insert(0, str(TEMPO_SIMULACAO))
+        self.entrada_duracao.grid(row=5, column=1, pady=5)
+        
+        ttk.Button(frame_esquerda, text="Executar Simulação Visual", 
+                  command=self.executar_visual).grid(row=6, column=0, columnspan=2, pady=15)
+        
+        ttk.Label(frame_esquerda, text="Resultados", 
+                 font=('Arial', 12, 'bold')).grid(row=7, column=0, columnspan=2, pady=5)
+        
+        self.texto_resultados = scrolledtext.ScrolledText(frame_esquerda, width=50, height=18, 
+                                                          wrap=tk.WORD, state='disabled')
+        self.texto_resultados.grid(row=8, column=0, columnspan=2, pady=5)
+        
+        # Lado direito
+        frame_direita = ttk.Frame(frame_principal, padding="10")
+        frame_direita.grid(row=0, column=1, sticky="nsew")
+        frame_direita.columnconfigure(0, weight=1)
+        frame_direita.rowconfigure(2, weight=1)
+        
+        ttk.Label(frame_direita, text="Gráficos", 
+                 font=('Arial', 14, 'bold')).grid(row=0, column=0, pady=10)
+        
+        botoes = ttk.Frame(frame_direita)
+        botoes.grid(row=1, column=0, pady=5)
+        
+        ttk.Button(botoes, text="📊 Fila de Espera", 
+                  command=self.mostrar_fila).pack(side=tk.LEFT, padx=5)
+        ttk.Button(botoes, text="📊 Ocupação Médicos", 
+                  command=self.mostrar_ocupacao).pack(side=tk.LEFT, padx=5)
+        ttk.Button(botoes, text="📊 Taxa vs Fila", 
+                  command=self.mostrar_taxa_vs_fila).pack(side=tk.LEFT, padx=5)
+        
+        self.frame_grafico = ttk.Frame(frame_direita)
+        self.frame_grafico.grid(row=2, column=0, sticky="nsew")
+    
+    def executar_visual(self):
+        try:
+            taxa = float(self.entrada_taxa.get())
+            medicos = int(self.entrada_medicos.get())
+            tempo = float(self.entrada_tempo.get())
+            duracao = float(self.entrada_duracao.get())
+            distribuicao = self.combo_distribuicao.get()
+            
+            janela_vis = JanelaVisualizacao(medicos)
+            
+            def rodar_simulacao():
+                resultados = simular_clinica(taxa, medicos, tempo, duracao, distribuicao, janela_vis)
+                
+                if not janela_vis.esta_fechada():
+                    self.resultados = resultados
+                    texto = f"""
+Doentes atendidos: {resultados['atendidos']}
+Tempo médio de espera: {resultados['tempo_espera']:.1f} min
+Fila média: {resultados['fila_media']:.1f} doentes
+Fila máxima: {resultados['fila_maxima']} doentes
+Ocupação dos médicos: {resultados['ocupacao']:.1f}%
+"""
+                    self.janela.after(0, lambda: self.atualizar_texto(texto))
+            
+            thread = threading.Thread(target=rodar_simulacao, daemon=True)
+            thread.start()
+            
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro: {str(e)}")
+    
+    def atualizar_texto(self, texto):
+        self.texto_resultados.config(state='normal')
+        self.texto_resultados.delete(1.0, tk.END)
+        self.texto_resultados.insert(1.0, texto)
+        self.texto_resultados.config(state='disabled')
+    
+    def limpar_grafico(self):
+        for widget in self.frame_grafico.winfo_children():
+            widget.destroy()
+    
+    def mostrar_fila(self):
+        if not self.resultados:
+            messagebox.showwarning("Aviso", "Execute a simulação primeiro!")
+            return
+        
+        self.limpar_grafico()
+        
+        fig = Figure(figsize=(9, 5))
+        ax = fig.add_subplot(111)
+        ax.plot(self.resultados['tempo_fila'], self.resultados['tamanhos_fila'])
+        ax.set_xlabel('Tempo (minutos)')
+        ax.set_ylabel('Pessoas na Fila')
+        ax.set_title('Evolução da Fila de Espera')
+        ax.grid(True, alpha=0.3)
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+    
+    def mostrar_ocupacao(self):
+        if not self.resultados:
+            messagebox.showwarning("Aviso", "Execute a simulação primeiro!")
+            return
+        
+        self.limpar_grafico()
+        
+        fig = Figure(figsize=(9, 5))
+        ax = fig.add_subplot(111)
+        ax.plot(self.resultados['timestamps_ocupacao'], 
+                self.resultados['ocupacao_tempo'], color='orange')
+        ax.set_xlabel('Tempo (minutos)')
+        ax.set_ylabel('Ocupação (%)')
+        ax.set_title('Ocupação dos Médicos ao Longo do Tempo')
+        ax.set_ylim(0, 105)
+        ax.grid(True, alpha=0.3)
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+    
+    def mostrar_taxa_vs_fila(self):
+        try:
+            self.limpar_grafico()
+            
+            medicos = int(self.entrada_medicos.get())
+            tempo = float(self.entrada_tempo.get())
+            duracao = float(self.entrada_duracao.get())
+            distribuicao = self.combo_distribuicao.get()
+            
+            taxas = range(5, 31, 2)
+            filas_medias = []
+            
+            for taxa in taxas:
+                res = simular_clinica(taxa, medicos, tempo, duracao, distribuicao)
+                filas_medias.append(res['fila_media'])
+            
+            fig = Figure(figsize=(9, 5))
+            ax = fig.add_subplot(111)
+            ax.plot(taxas, filas_medias, marker='o', linewidth=2, markersize=6, color='blue')
+            ax.set_xlabel('Taxa de Chegada (doentes/hora)')
+            ax.set_ylabel('Tamanho Médio da Fila')
+            ax.set_title('Relação entre Taxa de Chegada e Tamanho da Fila')
+            ax.grid(True, alpha=.3)
+            fig.tight_layout()
+            
+            canvas = FigureCanvasTkAgg(fig, master=self.frame_grafico)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            
+            self.atualizar_texto("Gráfico gerado com sucesso!")
+            
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao gerar gráfico: {str(e)}")
+
+if __name__ == '__main__':
+    janela = tk.Tk()
+    app = AplicacaoClinica(janela)
+    janela.mainloop()
